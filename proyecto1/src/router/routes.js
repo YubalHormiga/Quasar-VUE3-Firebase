@@ -1,11 +1,15 @@
 const routes = [
   {
     path: "/",
-    component: () => import("layouts/MainLayout.vue"),
+    component: () => import("layouts/LayoutYubal.vue"),
     children: [
       {
         path: "",
-        component: () => import("pages/SeccionNueve.vue"),
+        component: () => import("pages/Quasar-16.vue"),
+      },
+      {
+        path: "/quasar-11",
+        component: () => import("pages/Quasar-11.vue"),
       },
     ],
   },
