@@ -5,7 +5,7 @@ const routes = [
     children: [
       {
         path: "",
-        component: () => import("pages/Quasar-16.vue"),
+        component: () => import("pages/Seccion-21-Axios copy.vue"),
       },
       {
         path: "/quasar-11",
