@@ -5,11 +5,14 @@ const routes = [
     children: [
       {
         path: "",
-        component: () => import("pages/Seccion-26-Firebase.vue"),
+        component: () => import("pages/Seccion-28-DesarrolloAndroid.vue"),
       },
       {
-        path: "/quasar-11",
-        component: () => import("pages/Quasar-11.vue"),
+        path: "/inicio",
+        component: () => import("pages/IniciadaSesion.vue"),
+        meta: {
+          requiresAuth: true, // Asegura que solo usuarios autenticados puedan acceder a esta ruta
+        },
       },
     ],
   },

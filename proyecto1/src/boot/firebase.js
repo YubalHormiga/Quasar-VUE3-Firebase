@@ -2,6 +2,7 @@ import { boot } from "quasar/wrappers";
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getAuth, GoogleAuthProvider,createUserWithEmailAndPassword,signInWithEmailAndPassword  } from "firebase/auth";
 
 import { VueFire } from "vuefire";
 
@@ -17,7 +18,10 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const storage = getStorage(app)
+const storage = getStorage(app);
+const auth = getAuth(app);
+auth.languageCode = 'es'
+const provider = new GoogleAuthProvider();
 
 // "async" is optional;
 // more info on params: https://v2.quasar.dev/quasar-cli/boot-files
@@ -31,4 +35,4 @@ export default boot(({ app }) => {
     ],
   });
 });
-export { db, storage };
+export { db, storage, auth, provider,createUserWithEmailAndPassword, signInWithEmailAndPassword  };
