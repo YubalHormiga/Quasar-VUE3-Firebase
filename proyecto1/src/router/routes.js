@@ -5,7 +5,7 @@ const routes = [
     children: [
       {
         path: "",
-        component: () => import("pages/Seccion-25-Firebase.vue"),
+        component: () => import("pages/Seccion-26-Firebase.vue"),
       },
       {
         path: "/quasar-11",

@@ -1,6 +1,5 @@
 <script setup>
 import { ref, onMounted } from "vue";
-
 import {
   collection,
   addDoc,
@@ -9,7 +8,13 @@ import {
   updateDoc,
   onSnapshot,
 } from "firebase/firestore";
-import { db } from "../boot/firebase";
+import {
+  ref as refStorage,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject
+} from "firebase/storage";
+import { db, storage } from "../boot/firebase";
 import { useQuasar } from "quasar";
 
 const $q = useQuasar();
@@ -18,10 +23,12 @@ const nuevoAnuncio = ref({
   titulo: "",
   descripcion: "",
   precio: 0.0,
-  imagenURL: "",
 });
 
 const anuncios = ref([]);
+const imagenFile = ref(null);
+const imagenURL = ref("");
+
 const mostrarModal = ref(false);
 
 const cargarAnuncios = () => {
@@ -34,8 +41,8 @@ const cargarAnuncios = () => {
     }));
   });
 };
+
 const limpiarInputs = () => {
-  // Reinicia los campos de nuevoAnuncio
   nuevoAnuncio.value = {
     titulo: "",
     descripcion: "",
@@ -43,14 +50,39 @@ const limpiarInputs = () => {
     imagenURL: "",
   };
 };
+
 onMounted(() => {
   cargarAnuncios();
 });
 
+const subirImagen = async () => {
+  try {
+    if (imagenFile.value) {
+      const storageRef = refStorage(storage, `imagenes/${imagenFile.value.name}`);
+
+      // Si imagenURL ya está configurada, eliminar la imagen anterior
+      if (nuevoAnuncio.value.imagenURL) {
+        const prevStorageRef = refStorage(storage, nuevoAnuncio.value.imagenURL);
+        await deleteObject(prevStorageRef);
+      }
+
+      await uploadBytes(storageRef, imagenFile.value);
+      nuevoAnuncio.value.imagenURL = await getDownloadURL(storageRef);
+    }
+  } catch (error) {
+    console.error("Error al subir la imagen: ", error);
+  }
+};
+
+const getImagenSeleccionadaUrl = () => {
+  return imagenFile.value ? URL.createObjectURL(imagenFile.value) : "";
+};
+
 const guardarAnuncio = async () => {
   try {
+    await subirImagen();
+
     if (nuevoAnuncio.value.id) {
-      // Si tiene un ID, entonces es una edición
       await updateDoc(doc(db, "anuncios", nuevoAnuncio.value.id), {
         titulo: nuevoAnuncio.value.titulo,
         descripcion: nuevoAnuncio.value.descripcion,
@@ -63,10 +95,8 @@ const guardarAnuncio = async () => {
         message: "Anuncio actualizado exitosamente",
       });
 
-      // Reinicia los campos de nuevoAnuncio
       limpiarInputs();
     } else {
-      // Si no tiene un ID, entonces es un nuevo anuncio
       const docRef = await addDoc(
         collection(db, "anuncios"),
         nuevoAnuncio.value
@@ -78,9 +108,10 @@ const guardarAnuncio = async () => {
         message: "Anuncio creado exitosamente",
       });
     }
+
     mostrarModal.value = false;
-    // Reinicia los campos de nuevoAnuncio
     limpiarInputs();
+    imagenFile.value = null;
   } catch (e) {
     console.error("Error al guardar el anuncio: ", e);
     $q.notify({
@@ -89,40 +120,86 @@ const guardarAnuncio = async () => {
     });
   }
 };
+const eliminarProducto = async (id, imagenURL) => {
+  try {
+    // Eliminar documento en la base de datos
+    await deleteDoc(doc(db, "anuncios", id));
 
-const eliminarProducto = async (id) => {
-  await deleteDoc(doc(db, "anuncios", id));
+    // Eliminar imagen del storage si existe una URL asociada
+    if (imagenURL) {
+      // Construir la referencia al storage usando la URL directamente
+      const storageRef = refStorage(storage, imagenURL);
+
+      // Eliminar el objeto
+      await deleteObject(storageRef);
+    }
+
+    $q.notify({
+      type: "positive",
+      message: "Anuncio eliminado exitosamente",
+    });
+  } catch (error) {
+    console.error("Error al eliminar el anuncio: ", error);
+    $q.notify({
+      type: "negative",
+      message: "Error al eliminar el anuncio",
+    });
+  }
 };
 
+
+
+
 const editarProducto = (anuncio) => {
-  // Copia los datos del anuncio para editar en el objeto nuevoAnuncio
-  console.log(anuncio)
   nuevoAnuncio.value = { ...anuncio };
   mostrarModal.value = true;
 };
 </script>
 
 <template>
-  <q-page padding>
-    <q-form @submit="guardarAnuncio">
+  <q-page padding class="row">
+    <q-form @submit="guardarAnuncio" class="col-6">
+      <!-- Formulario de entrada -->
       <q-input v-model="nuevoAnuncio.titulo" label="Título" />
       <q-input v-model="nuevoAnuncio.descripcion" label="Descripción" />
       <q-input v-model="nuevoAnuncio.precio" label="Precio" type="number" />
+      <q-file
+        dense
+        outlined
+        clearable
+        v-model="imagenFile"
+        label="Seleccionar imagen"
+        label-color="primary"
+        accept=".jpg, jpeg, image/*"
+        @update:model-value="getImagenSeleccionadaUrl"
+      />
 
+      <img
+        v-if="imagenFile"
+        :src="getImagenSeleccionadaUrl()"
+        alt="Imagen seleccionada"
+      />
       <q-btn type="submit" label="Guardar" color="primary" />
     </q-form>
 
-    <q-page-container>
+    <q-page-container class="">
       <q row class="q-gutter-md">
+        <!-- Lista de anuncios -->
         <q col v-for="(anuncio, index) in anuncios" :key="index" cols="4">
           <q-card>
             <q-card-section>
               <div class="text-h6">{{ anuncio.titulo }}</div>
               <div>{{ anuncio.descripcion }}</div>
               <div>Precio: {{ anuncio.precio }}</div>
+              <img
+                v-if="anuncio.imagenURL"
+                :src="anuncio.imagenURL"
+                alt="Imagen almacenada"
+              />
             </q-card-section>
+
             <q-btn
-              @click="eliminarProducto(anuncio.id)"
+              @click="eliminarProducto(anuncio.id, anuncio.imagenURL)"
               icon="delete"
               label="Eliminar"
               color="negative"
@@ -137,11 +214,12 @@ const editarProducto = (anuncio) => {
         </q>
       </q>
     </q-page-container>
-    <!-- Modal -->
+
     <q-dialog v-model="mostrarModal">
       <q-card>
         <q-card-section>
           <q-form @submit="guardarAnuncio">
+            <!-- Formulario en el modal -->
             <q-input v-model="nuevoAnuncio.titulo" label="Título" />
             <q-input v-model="nuevoAnuncio.descripcion" label="Descripción" />
             <q-input
@@ -149,7 +227,23 @@ const editarProducto = (anuncio) => {
               label="Precio"
               type="number"
             />
+            <q-file
+              dense
+              outlined
+              clearable
+              v-model="imagenFile"
+              label="Seleccionar imagen"
+              label-color="primary"
+              accept=".jpg, jpeg, image/*"
+              @update:model-value="getImagenSeleccionadaUrl"
+              class="q-mx-md"
+            />
 
+            <img
+              v-if="imagenFile"
+              :src="getImagenSeleccionadaUrl()"
+              alt="Imagen seleccionada"
+            />
             <q-btn type="submit" label="Guardar" color="primary" />
           </q-form>
         </q-card-section>
